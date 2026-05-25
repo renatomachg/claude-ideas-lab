@@ -1749,6 +1749,173 @@ const IdeaCard = ({ idea, onExpand, onDebate, onDelete, onCycleStatus, onEditDat
   );
 };
 
+// ─── Agent Panel ─────────────────────────────────────────────────────
+const AgentPanel = ({ ideas, onAddIdea }) => {
+  const [insight,  setInsight]  = useState(null);
+  const [loading,  setLoading]  = useState(false);
+  const [error,    setError]    = useState(null);
+  const [added,    setAdded]    = useState({});
+
+  const AGENT_URL = "/api/agent";
+
+  const fmtWeek = (iso) => {
+    if (!iso) return "";
+    const d = new Date(iso + "T12:00:00");
+    return d.toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" });
+  };
+
+  const load = async (force = false) => {
+    setLoading(true); setError(null);
+    try {
+      const method = force ? "POST" : "GET";
+      const body   = force ? JSON.stringify({ ideas: ideas.slice(0, 25).map(i => ({ title: i.title, description: i.description, venture: i.venture, status: i.status })) }) : undefined;
+      const res = await fetch(AGENT_URL, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        ...(body ? { body } : {}),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || "Error del agente");
+      setInsight(d.data || d);
+    } catch (e) {
+      setError(e.message);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const addIdea = (idea) => {
+    onAddIdea({ title: idea.titulo, description: `${idea.descripcion} — ${idea.por_que_ahora}`, venture: idea.venture, type: "Artifact", status: "Idea" });
+    setAdded(p => ({ ...p, [idea.titulo]: true }));
+  };
+
+  return (
+    <div style={{ maxWidth: "780px" }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "28px" }}>
+        <div>
+          <div style={{ fontSize: "26px", fontWeight: "800", color: C.text, letterSpacing: "-0.4px" }}>✦ Agente</div>
+          <div style={{ fontSize: "13px", color: C.muted, marginTop: "3px" }}>
+            {insight?.week_start ? `Semana del ${fmtWeek(insight.week_start)}` : "Análisis semanal con IA + tendencias web"}
+          </div>
+        </div>
+        <button onClick={() => load(true)} disabled={loading}
+          style={{ background: C.navy, color: "#fff", border: "none", borderRadius: "14px", padding: "11px 20px", fontSize: "13px", fontWeight: "800", cursor: loading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: "8px", opacity: loading ? 0.7 : 1 }}>
+          {loading ? <><Spin size={13} color="#fff" /> Analizando...</> : "↻ Ejecutar ahora"}
+        </button>
+      </div>
+
+      {error && (
+        <div style={{ background: "#FEF0F0", border: `1px solid ${C.rose}30`, borderRadius: "18px", padding: "18px", marginBottom: "20px" }}>
+          <div style={{ fontSize: "13px", color: C.rose, fontWeight: "700", marginBottom: "4px" }}>Error al ejecutar el agente</div>
+          <div style={{ fontSize: "12px", color: C.muted }}>{error}</div>
+          <div style={{ fontSize: "12px", color: C.muted, marginTop: "8px" }}>¿Tienes ANTHROPIC_API_KEY configurada en Vercel?</div>
+        </div>
+      )}
+
+      {loading && !insight && (
+        <div style={{ display: "flex", justifyContent: "center", padding: "80px 0", flexDirection: "column", alignItems: "center", gap: "16px" }}>
+          <Spin size={36} color={C.navy} />
+          <div style={{ fontSize: "14px", color: C.muted }}>Buscando tendencias + analizando tu portafolio...</div>
+        </div>
+      )}
+
+      {!insight && !loading && !error && (
+        <div style={{ textAlign: "center", padding: "64px 0" }}>
+          <div style={{ fontSize: "44px", marginBottom: "14px" }}>✦</div>
+          <div style={{ fontSize: "18px", fontWeight: "800", color: C.text, marginBottom: "8px" }}>Sin insights esta semana</div>
+          <div style={{ fontSize: "14px", color: C.muted, marginBottom: "24px" }}>Dale a "Ejecutar ahora" para generar el análisis</div>
+          <button onClick={() => load(true)}
+            style={{ background: C.navy, color: "#fff", border: "none", borderRadius: "100px", padding: "14px 28px", fontSize: "14px", fontWeight: "800", cursor: "pointer" }}>
+            Ejecutar agente
+          </button>
+        </div>
+      )}
+
+      {insight && (
+        <div className="fade">
+          {/* 3 Ideas nuevas */}
+          {(insight.ideas || []).length > 0 && (
+            <div style={{ marginBottom: "24px" }}>
+              <div style={{ fontSize: "11px", fontWeight: "800", letterSpacing: "1px", color: C.muted, marginBottom: "14px" }}>💡 IDEAS NUEVAS SUGERIDAS</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                {insight.ideas.map((idea, i) => {
+                  const vm2 = getVM(idea.venture);
+                  const isAdded = added[idea.titulo];
+                  return (
+                    <div key={i} style={{ background: C.card, borderRadius: "22px", padding: "20px 22px", border: `1px solid ${C.line}`, display: "flex", gap: "16px", alignItems: "flex-start" }}>
+                      <div style={{ width: "38px", height: "38px", borderRadius: "12px", background: vm2.light, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", fontWeight: "800", color: vm2.color, flexShrink: 0 }}>{vm2.letter}</div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "5px" }}>
+                          <span style={{ fontSize: "15px", fontWeight: "800", color: C.text }}>{idea.titulo}</span>
+                          <Tag label={idea.venture} color={vm2.color} bg={vm2.light} />
+                        </div>
+                        <div style={{ fontSize: "13px", color: C.sub, lineHeight: "1.65", marginBottom: "8px" }}>{idea.descripcion}</div>
+                        {idea.por_que_ahora && (
+                          <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: C.yellow + "25", borderRadius: "100px", padding: "4px 12px" }}>
+                            <span style={{ fontSize: "11px", fontWeight: "700", color: C.brown }}>⚡ {idea.por_que_ahora}</span>
+                          </div>
+                        )}
+                      </div>
+                      <button onClick={() => addIdea(idea)} disabled={isAdded}
+                        style={{ flexShrink: 0, background: isAdded ? C.green + "20" : vm2.color, color: isAdded ? C.green : "#fff", border: "none", borderRadius: "12px", padding: "10px 16px", fontSize: "12px", fontWeight: "800", cursor: isAdded ? "default" : "pointer", whiteSpace: "nowrap", transition: "all 0.2s" }}>
+                        {isAdded ? "✓ Agregada" : "+ Al lab"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Grid: sinergia + alerta + prioridad */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "12px" }}>
+            {insight.sinergia && (
+              <div style={{ background: C.card, borderRadius: "22px", padding: "20px", border: `1px solid ${C.line}`, gridColumn: "1 / -1" }}>
+                <div style={{ fontSize: "11px", fontWeight: "800", color: C.purple, letterSpacing: "0.8px", marginBottom: "10px" }}>🔗 SINERGIA DETECTADA</div>
+                <div style={{ fontSize: "14px", fontWeight: "700", color: C.text, marginBottom: "6px" }}>{insight.sinergia.descripcion}</div>
+                {(insight.sinergia.ventures || []).length > 0 && (
+                  <div style={{ display: "flex", gap: "6px", marginBottom: "10px" }}>
+                    {insight.sinergia.ventures.map((v, i) => { const vm2 = getVM(v); return <Tag key={i} label={v} color={vm2.color} bg={vm2.light} />; })}
+                  </div>
+                )}
+                {insight.sinergia.accion && (
+                  <div style={{ background: C.purple + "12", borderRadius: "12px", padding: "10px 14px" }}>
+                    <span style={{ fontSize: "13px", color: C.purple, fontWeight: "600" }}>→ {insight.sinergia.accion}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {insight.prioridad && (
+              <div style={{ background: `linear-gradient(135deg, ${C.navy}, #4A5FBB)`, borderRadius: "22px", padding: "20px" }}>
+                <div style={{ fontSize: "11px", fontWeight: "800", color: "rgba(255,255,255,0.55)", letterSpacing: "0.8px", marginBottom: "10px" }}>🎯 PRIORIDAD DE LA SEMANA</div>
+                <div style={{ fontSize: "15px", fontWeight: "800", color: "#fff", marginBottom: "6px" }}>{insight.prioridad.titulo}</div>
+                <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.75)", lineHeight: "1.6", marginBottom: "12px" }}>{insight.prioridad.razon}</div>
+                {insight.prioridad.primer_paso && (
+                  <div style={{ background: "rgba(255,255,255,0.15)", borderRadius: "12px", padding: "10px 14px" }}>
+                    <div style={{ fontSize: "10px", fontWeight: "800", color: "rgba(255,255,255,0.5)", marginBottom: "4px" }}>PRIMER PASO</div>
+                    <span style={{ fontSize: "13px", color: "#fff", fontWeight: "600" }}>{insight.prioridad.primer_paso}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {insight.alerta && (
+              <div style={{ background: C.card, borderRadius: "22px", padding: "20px", border: `1.5px solid ${C.rose}25` }}>
+                <div style={{ fontSize: "11px", fontWeight: "800", color: C.rose, letterSpacing: "0.8px", marginBottom: "10px" }}>⚠ ALERTA</div>
+                <div style={{ fontSize: "14px", fontWeight: "700", color: C.text, marginBottom: "6px" }}>{insight.alerta.titulo}</div>
+                <div style={{ fontSize: "13px", color: C.sub, lineHeight: "1.6" }}>{insight.alerta.descripcion}</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── Idea Detail View ────────────────────────────────────────────────
 const IdeaDetailView = ({ idea, onBack, onSaveChat, onExpand, onDebate, onDelete, onCycleStatus, onEditDate, onUpdateChecklist, onLogTime, onSaveTags, onSavePriority, onSaveAttachments, onPresent, loadingAI, loadingDebate }) => {
   const vm = getVM(idea.venture);
@@ -2563,6 +2730,7 @@ export default function App() {
   const NAV = [
     { id: "home",        icon: "⊙", label: "Home"      },
     { id: "projects",    icon: "◈", label: "Proyectos" },
+    { id: "agent",       icon: "✦", label: "Agente"    },
     { id: "calendar",    icon: "◫", label: "Calendar"  },
     { id: "connections", icon: "🔗", label: "Links"    },
     { id: "data",        icon: "⌗", label: "Data"      },
@@ -2694,7 +2862,7 @@ export default function App() {
             <div style={{ padding: "40px 0 28px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <div>
                 <div style={{ fontSize: "32px", fontWeight: "800", color: C.text, letterSpacing: "-0.5px" }}>
-                  {tab === "home" ? "Mis Ideas" : tab === "calendar" ? "Calendario" : tab === "connections" ? "Conexiones" : "Dashboard"}
+                  {tab === "home" ? "Mis Ideas" : tab === "calendar" ? "Calendario" : tab === "connections" ? "Conexiones" : tab === "agent" ? "Agente" : "Dashboard"}
                 </div>
                 <div style={{ fontSize: "13px", color: C.muted, marginTop: "4px" }}>{ideas.length} ideas · {user?.email}</div>
               </div>
@@ -2893,6 +3061,13 @@ export default function App() {
           {tab === "calendar"    && <CalView ideas={ideas} onSelectIdea={idea => { setTab("home"); setVenture("Todos"); setStatusF("Todos"); }} />}
           {tab === "connections" && <ConnectionsView ideas={ideas} loading={loadingConn} connections={connections} onGenerate={generateConnections} />}
           {tab === "data"        && <DataTab ideas={ideas} />}
+          {tab === "agent"       && (
+            <AgentPanel ideas={ideas} onAddIdea={({ title, description, venture: v, type, status }) => {
+              const row = { id: genId(), title, description, venture: v, type, status, expansion: "", debate: "", user_id: user?.id };
+              setIdeas(p => [{ ...row, createdAt: new Date().toISOString(), startDate: "", durationWeeks: 1, checklist: [], timeLogs: [], chatHistory: [], tags: [], priority: "media", attachments: [] }, ...p]);
+              try { dbInsert(row); } catch {}
+            }} />
+          )}
 
           {/* ── Proyectos tab ── */}
           {tab === "projects" && !activeProject && (
