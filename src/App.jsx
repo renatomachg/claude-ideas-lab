@@ -1600,34 +1600,35 @@ const IdeaCard = ({ idea, onExpand, onDebate, onDelete, onCycleStatus, onEditDat
   };
 
   return (
-    <div style={{ background: C.card, borderRadius: "24px", overflow: "hidden", boxShadow: selected ? `0 0 0 2px ${C.navy}, 0 12px 36px rgba(0,0,0,0.1)` : "0 2px 16px rgba(0,0,0,0.07)", transition: "transform 0.2s, box-shadow 0.2s" }}
-      onMouseEnter={e => { if (!selected) { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 12px 36px rgba(0,0,0,0.1)"; }}}
-      onMouseLeave={e => { if (!selected) { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 2px 16px rgba(0,0,0,0.07)"; }}}>
+    <div style={{ background: vm.light, borderRadius: "24px", overflow: "hidden", boxShadow: selected ? `0 0 0 2px ${vm.color}, 0 12px 36px ${vm.color}25` : `0 2px 16px ${vm.color}18`, transition: "transform 0.2s, box-shadow 0.2s" }}
+      onMouseEnter={e => { if (!selected) { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = `0 12px 32px ${vm.color}30`; }}}
+      onMouseLeave={e => { if (!selected) { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = `0 2px 16px ${vm.color}18`; }}}>
 
       {showSimilar && <SimilarIdeasModal idea={idea} onClose={() => setShowSimilar(false)} />}
-
-      {/* Top color bar */}
-      <div style={{ height: "4px", background: `linear-gradient(90deg, ${vm.color}, ${vm.color}30)` }} />
 
       <div style={{ padding: "22px 22px 20px" }}>
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "14px" }}>
-          <Tag label={idea.venture} color={vm.color} bg={vm.light} />
+          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+            <Tag label={idea.venture} color={vm.color} bg={"rgba(255,255,255,0.7)"} />
+            <Tag label={idea.type} color={C.muted} bg={"rgba(255,255,255,0.5)"} />
+          </div>
           <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
             {compareMode && (
               <button onClick={() => onToggleSelect(idea.id)}
-                style={{ width: "24px", height: "24px", borderRadius: "7px", border: `2px solid ${selected ? C.navy : C.line}`, background: selected ? C.navy : "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}>
+                style={{ width: "24px", height: "24px", borderRadius: "7px", border: `2px solid ${selected ? vm.color : vm.color + "50"}`, background: selected ? vm.color : "rgba(255,255,255,0.6)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}>
                 {selected && <span style={{ color: "#fff", fontSize: "12px", fontWeight: "800" }}>✓</span>}
               </button>
             )}
-            <button onClick={() => onPresent(idea)} style={{ background: "none", border: "none", color: C.muted, fontSize: "18px", cursor: "pointer", lineHeight: 1 }} title="Modo presentación">⎙</button>
-            <button onClick={() => onDelete(idea.id)} style={{ background: "none", border: "none", color: C.line, fontSize: "22px", cursor: "pointer", lineHeight: 1, transition: "color 0.15s" }}
-              onMouseEnter={e => e.target.style.color = C.orange} onMouseLeave={e => e.target.style.color = C.line}>×</button>
+            <button onClick={() => onPresent(idea)} style={{ background: "rgba(255,255,255,0.5)", border: "none", borderRadius: "8px", width: "28px", height: "28px", color: C.muted, fontSize: "14px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }} title="Modo presentación">⎙</button>
+            <button onClick={() => onDelete(idea.id)} style={{ background: "rgba(255,255,255,0.5)", border: "none", borderRadius: "8px", width: "28px", height: "28px", color: C.muted, fontSize: "16px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}
+              onMouseEnter={e => { e.currentTarget.style.background = "#FFE4E4"; e.currentTarget.style.color = C.rose; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.5)"; e.currentTarget.style.color = C.muted; }}>×</button>
           </div>
         </div>
 
         {/* Title + avatar */}
-        <div style={{ display: "flex", gap: "14px", alignItems: "flex-start", marginBottom: "10px" }}>
+        <div style={{ display: "flex", gap: "14px", alignItems: "flex-start", marginBottom: "12px" }}>
           <div style={{ flex: 1 }}>
             <div onClick={() => onOpen && onOpen(idea.id)}
               style={{ fontSize: "18px", fontWeight: "800", color: C.text, lineHeight: 1.3, letterSpacing: "-0.2px", marginBottom: "6px", cursor: onOpen ? "pointer" : "default" }}
@@ -1637,70 +1638,69 @@ const IdeaCard = ({ idea, onExpand, onDebate, onDelete, onCycleStatus, onEditDat
             </div>
             {idea.description && <div style={{ fontSize: "13px", color: C.sub, lineHeight: "1.65" }}>{idea.description}</div>}
           </div>
-          <AvatarBox letter={vm.letter} color={vm.color} />
+          <div style={{ width: "44px", height: "44px", borderRadius: "14px", background: vm.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", fontWeight: "800", color: "#fff", flexShrink: 0 }}>{vm.letter}</div>
         </div>
 
         {/* Inline tags */}
         {(idea.tags || []).length > 0 && (
           <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "10px" }}>
             {(idea.tags || []).map(t => (
-              <span key={t} style={{ padding: "3px 10px", borderRadius: "100px", background: tagColor(t) + "18", border: `1px solid ${tagColor(t)}35`, fontSize: "11px", fontWeight: "600", color: tagColor(t) }}>#{t}</span>
+              <span key={t} style={{ padding: "3px 10px", borderRadius: "100px", background: "rgba(255,255,255,0.6)", border: `1px solid ${tagColor(t)}35`, fontSize: "11px", fontWeight: "600", color: tagColor(t) }}>#{t}</span>
             ))}
           </div>
         )}
 
         {/* Meta row */}
-        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "16px", alignItems: "center" }}>
-          <button onClick={() => onCycleStatus(idea)} style={{ padding: "6px 14px", borderRadius: "100px", background: sm.bg, color: sm.color, border: "none", cursor: "pointer", fontSize: "12px", fontWeight: "700" }}>{idea.status}</button>
+        <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "18px", alignItems: "center" }}>
+          <button onClick={() => onCycleStatus(idea)} style={{ padding: "5px 12px", borderRadius: "100px", background: "rgba(255,255,255,0.7)", color: sm.color, border: "none", cursor: "pointer", fontSize: "12px", fontWeight: "700" }}>{idea.status}</button>
           <button onClick={() => onSavePriority(idea.id, PRIORITIES[(PRIORITIES.indexOf(idea.priority || "media") + 1) % PRIORITIES.length])}
-            style={{ padding: "6px 12px", borderRadius: "100px", background: pm.bg, color: pm.color, border: "none", cursor: "pointer", fontSize: "12px", fontWeight: "700" }} title="Click para cambiar prioridad">
+            style={{ padding: "5px 11px", borderRadius: "100px", background: "rgba(255,255,255,0.7)", color: pm.color, border: "none", cursor: "pointer", fontSize: "12px", fontWeight: "700" }} title="Click para cambiar prioridad">
             {pm.icon} {pm.label}
           </button>
-          <span style={{ padding: "6px 14px", borderRadius: "100px", background: C.bg, color: C.muted, fontSize: "12px", fontWeight: "600" }}>{idea.type}</span>
-          {idea.startDate && <span style={{ padding: "6px 14px", borderRadius: "100px", background: "#E8ECF8", color: C.navy, fontSize: "12px", fontWeight: "700" }}>📅 {fmtDate(idea.startDate)}</span>}
-          {totalTime > 0 && <span style={{ padding: "6px 14px", borderRadius: "100px", background: "#FEF0EA", color: C.orange, fontSize: "12px", fontWeight: "700" }}>⏱ {totalTime.toFixed(1)}h</span>}
-          <button onClick={() => onEditDate(idea)} style={{ padding: "6px 12px", borderRadius: "100px", background: C.bg, color: C.muted, border: "none", cursor: "pointer", fontSize: "12px" }}>📅</button>
-          <span style={{ fontSize: "12px", color: C.muted, marginLeft: "auto" }}>{fmtDate(idea.createdAt)}</span>
+          {idea.startDate && <span style={{ padding: "5px 12px", borderRadius: "100px", background: "rgba(255,255,255,0.7)", color: C.navy, fontSize: "12px", fontWeight: "700" }}>📅 {fmtDate(idea.startDate)}</span>}
+          {totalTime > 0 && <span style={{ padding: "5px 12px", borderRadius: "100px", background: "rgba(255,255,255,0.7)", color: C.orange, fontSize: "12px", fontWeight: "700" }}>⏱ {totalTime.toFixed(1)}h</span>}
+          <button onClick={() => onEditDate(idea)} style={{ padding: "5px 10px", borderRadius: "100px", background: "rgba(255,255,255,0.5)", color: C.muted, border: "none", cursor: "pointer", fontSize: "12px" }}>📅</button>
+          <span style={{ fontSize: "11px", color: vm.color + "99", marginLeft: "auto", fontWeight: "600" }}>{fmtDate(idea.createdAt)}</span>
         </div>
 
         {/* ── Botón principal: Desarrollar ── */}
         <button onClick={() => toggle("chat")}
-          style={{ width: "100%", padding: "14px", borderRadius: "18px", border: "none", background: panel === "chat" ? "#F0EEF8" : `linear-gradient(135deg, ${C.navy}, #4A5FBB)`, color: panel === "chat" ? C.navy : "#fff", fontSize: "14px", fontWeight: "800", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", marginBottom: "10px", boxShadow: panel === "chat" ? "none" : `0 4px 16px ${C.navy}40`, transition: "all 0.2s", letterSpacing: "-0.2px" }}>
-          <span style={{ fontSize: "16px" }}>✦</span>
+          style={{ width: "100%", padding: "13px", borderRadius: "16px", border: "none", background: panel === "chat" ? "rgba(255,255,255,0.8)" : vm.color, color: panel === "chat" ? vm.color : "#fff", fontSize: "14px", fontWeight: "800", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", marginBottom: "8px", boxShadow: panel === "chat" ? "none" : `0 4px 14px ${vm.color}50`, transition: "all 0.2s", letterSpacing: "-0.2px" }}>
+          <span style={{ fontSize: "15px" }}>✦</span>
           {panel === "chat" ? "Cerrar chat" : "Desarrollar con Claude"}
         </button>
 
         {/* ── Botones secundarios ── */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "4px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginBottom: "4px" }}>
           <button onClick={() => toggle("analysis")}
-            style={{ padding: "11px", borderRadius: "14px", border: "none", background: panel === "analysis" ? C.bg : C.navy + "15", color: panel === "analysis" ? C.muted : C.navy, fontSize: "12px", fontWeight: "700", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", transition: "all 0.2s" }}>
-            {loadingAI ? <Spin size={12} color={C.navy} /> : "✦"} {panel === "analysis" ? "Cerrar" : "Análisis"}
+            style={{ padding: "10px", borderRadius: "12px", border: "none", background: panel === "analysis" ? vm.color + "20" : "rgba(255,255,255,0.65)", color: C.sub, fontSize: "12px", fontWeight: "700", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", transition: "all 0.2s" }}>
+            {loadingAI ? <Spin size={12} color={C.sub} /> : "✦"} {panel === "analysis" ? "Cerrar" : "Análisis"}
           </button>
           <button onClick={() => toggle("debate")}
-            style={{ padding: "11px", borderRadius: "14px", border: "none", background: panel === "debate" ? "#FFF8F8" : C.rose + "15", color: C.rose, fontSize: "12px", fontWeight: "700", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", transition: "all 0.2s" }}>
+            style={{ padding: "10px", borderRadius: "12px", border: "none", background: panel === "debate" ? "#FFE8E8" : "rgba(255,255,255,0.65)", color: C.rose, fontSize: "12px", fontWeight: "700", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", transition: "all 0.2s" }}>
             {loadingDebate ? <Spin size={12} color={C.rose} /> : "⚔"} {panel === "debate" ? "Cerrar" : "Abogado"}
           </button>
           <button onClick={() => toggle("checklist")}
-            style={{ padding: "11px", borderRadius: "14px", border: `1.5px solid ${C.purple}25`, background: panel === "checklist" ? "#F2EDF9" : "transparent", color: C.purple, fontSize: "12px", fontWeight: "700", cursor: "pointer", transition: "all 0.2s" }}>
+            style={{ padding: "10px", borderRadius: "12px", border: "none", background: panel === "checklist" ? "#EDE8F8" : "rgba(255,255,255,0.65)", color: C.purple, fontSize: "12px", fontWeight: "700", cursor: "pointer", transition: "all 0.2s" }}>
             ✓ {idea.checklist?.length > 0 ? `${idea.checklist.filter(s => s.done).length}/${idea.checklist.length}` : "Checklist"}
           </button>
           <button onClick={() => toggle("time")}
-            style={{ padding: "11px", borderRadius: "14px", border: `1.5px solid ${C.orange}25`, background: panel === "time" ? "#FEF0EA" : "transparent", color: C.orange, fontSize: "12px", fontWeight: "700", cursor: "pointer", transition: "all 0.2s" }}>
+            style={{ padding: "10px", borderRadius: "12px", border: "none", background: panel === "time" ? "#FEF0EA" : "rgba(255,255,255,0.65)", color: C.orange, fontSize: "12px", fontWeight: "700", cursor: "pointer", transition: "all 0.2s" }}>
             ⏱ {totalTime > 0 ? `${totalTime.toFixed(1)}h` : "Tiempo"}
           </button>
           <button onClick={() => toggle("tags")}
-            style={{ padding: "11px", borderRadius: "14px", border: `1.5px solid ${C.yellow}40`, background: panel === "tags" ? "#FEF9E8" : "transparent", color: C.brown, fontSize: "12px", fontWeight: "700", cursor: "pointer", transition: "all 0.2s" }}>
+            style={{ padding: "10px", borderRadius: "12px", border: "none", background: panel === "tags" ? "#FEF9E8" : "rgba(255,255,255,0.65)", color: C.brown, fontSize: "12px", fontWeight: "700", cursor: "pointer", transition: "all 0.2s" }}>
             🏷 Tags {(idea.tags || []).length > 0 ? `(${idea.tags.length})` : ""}
           </button>
           <button onClick={() => toggle("files")}
-            style={{ padding: "11px", borderRadius: "14px", border: `1.5px solid ${C.navy}20`, background: panel === "files" ? "#E8ECF8" : "transparent", color: C.navy, fontSize: "12px", fontWeight: "700", cursor: "pointer", transition: "all 0.2s" }}>
+            style={{ padding: "10px", borderRadius: "12px", border: "none", background: panel === "files" ? "#E8ECF8" : "rgba(255,255,255,0.65)", color: C.navy, fontSize: "12px", fontWeight: "700", cursor: "pointer", transition: "all 0.2s" }}>
             📎 {(idea.attachments || []).length > 0 ? `${idea.attachments.length} archivo${idea.attachments.length > 1 ? "s" : ""}` : "Archivos"}
           </button>
         </div>
 
         {/* Similar button */}
         <button onClick={() => setShowSimilar(true)}
-          style={{ width: "100%", marginTop: "8px", padding: "10px", borderRadius: "14px", border: `1.5px solid ${C.line}`, background: "transparent", color: C.muted, fontSize: "12px", fontWeight: "700", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+          style={{ width: "100%", marginTop: "6px", padding: "10px", borderRadius: "12px", border: "none", background: "rgba(255,255,255,0.5)", color: C.muted, fontSize: "12px", fontWeight: "700", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
           🔍 Buscar ideas similares y mejorar
         </button>
 
@@ -2533,12 +2533,12 @@ export default function App() {
   const [selectedIds,    setSelectedIds]    = useState([]);
   const [showCompare,    setShowCompare]    = useState(false);
   const [activeIdeaId,   setActiveIdeaId]   = useState(null);
-  const [form, setForm] = useState({ title: "", description: "", venture: "Mercasync", type: "Artifact", status: "Idea" });
+  const [form, setForm] = useState({ title: "", description: "", venture: "", type: "Artifact", status: "Idea" });
 
-  const allVentures = [...DEFAULT_VENTURES, ...customVentures];
+  const allVentures = [...new Set([...ideas.map(i => i.venture).filter(Boolean), ...customVentures])];
   const activeIdea  = activeIdeaId ? ideas.find(i => i.id === activeIdeaId) || null : null;
 
-  const addVenture = () => {
+  const addVenture = (onAdd) => {
     const name = newVentureName.trim();
     if (!name || allVentures.includes(name)) { setAddingVenture(false); setNewVentureName(""); return; }
     const updated = [...customVentures, name];
@@ -2546,6 +2546,7 @@ export default function App() {
     localStorage.setItem("customVentures", JSON.stringify(updated));
     setAddingVenture(false);
     setNewVentureName("");
+    if (onAdd) onAdd(name);
   };
 
   const mapRow = r => ({
@@ -2586,10 +2587,10 @@ export default function App() {
   useEffect(() => { if (user) load(); }, [load, user]);
 
   const save = async () => {
-    if (!form.title.trim()) return;
+    if (!form.title.trim() || !form.venture.trim()) return;
     const row = { id: genId(), title: form.title, description: form.description, venture: form.venture, type: form.type, status: form.status, expansion: "", debate: "", user_id: user?.id };
     setIdeas(p => [{ ...row, createdAt: new Date().toISOString(), startDate: "", durationWeeks: 1, checklist: [], timeLogs: [] }, ...p]);
-    setForm({ title: "", description: "", venture: "Mercasync", type: "Artifact", status: "Idea" });
+    setForm(f => ({ title: "", description: "", venture: f.venture, type: "Artifact", status: "Idea" }));
     setTab("home");
     try { await dbInsert(row); } catch { setSyncErr("Error guardando"); }
   };
@@ -2722,9 +2723,10 @@ export default function App() {
   if (!user) return <LoginScreen onAuth={handleAuth} />;
 
   return (
-    <div style={{ minHeight: "100vh", background: C.bg, fontFamily: "'DM Sans', system-ui, sans-serif", paddingBottom: isMobile ? "90px" : "0", display: isMobile ? "block" : "flex" }}>
+    <div style={{ minHeight: "100vh", background: C.bg, fontFamily: "'DM Sans', system-ui, sans-serif", paddingBottom: isMobile ? "90px" : "0", display: isMobile ? "block" : "flex", overflowX: "hidden" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&display=swap');
+        html, body { overflow-x: hidden; max-width: 100vw; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         ::-webkit-scrollbar { display: none; }
         input, textarea, select { outline: none; font-family: inherit; }
@@ -2798,9 +2800,9 @@ export default function App() {
       )}
 
       {/* ── Main content ── */}
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ flex: 1, minWidth: 0, overflowX: "hidden" }}>
       {!activeIdea && (
-        <div style={{ maxWidth: isMobile ? "480px" : "1200px", margin: "0 auto", padding: isMobile ? "0 20px" : "0 40px" }}>
+        <div style={{ maxWidth: isMobile ? "100%" : "1200px", width: "100%", margin: "0 auto", padding: isMobile ? "0 20px" : "0 40px", overflowX: "hidden" }}>
 
           {/* ── Mobile header ── */}
           {isMobile && (
@@ -2869,7 +2871,36 @@ export default function App() {
                 style={{ width: "100%", background: C.bg, border: "none", borderRadius: "16px", padding: "16px 18px", color: C.text, fontSize: "16px", fontWeight: "700", marginBottom: "12px" }} />
               <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Descripción breve..." rows={3}
                 style={{ width: "100%", background: C.bg, border: "none", borderRadius: "16px", padding: "16px 18px", color: C.sub, fontSize: "14px", marginBottom: "20px", resize: "vertical", lineHeight: "1.65" }} />
-              {[{ label: "Venture", key: "venture", opts: allVentures }, { label: "Tipo", key: "type", opts: TYPES }, { label: "Estado", key: "status", opts: STATUSES }].map(({ label, key, opts }) => (
+              {/* Venture */}
+              <div style={{ marginBottom: "16px" }}>
+                <div style={{ fontSize: "11px", fontWeight: "800", color: C.muted, letterSpacing: "0.8px", marginBottom: "8px" }}>PROYECTO / VENTURE</div>
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+                  {allVentures.map(o => (
+                    <button key={o} onClick={() => setForm(f => ({ ...f, venture: o }))}
+                      style={{ padding: "9px 18px", borderRadius: "100px", background: form.venture === o ? C.text : C.bg, color: form.venture === o ? "#fff" : C.muted, border: "none", cursor: "pointer", fontSize: "13px", fontWeight: "700", transition: "all 0.15s" }}>{o}</button>
+                  ))}
+                  {addingVenture ? (
+                    <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                      <input autoFocus value={newVentureName} onChange={e => setNewVentureName(e.target.value)}
+                        onKeyDown={e => { if (e.key === "Enter") addVenture(n => setForm(f => ({ ...f, venture: n }))); if (e.key === "Escape") { setAddingVenture(false); setNewVentureName(""); } }}
+                        placeholder="Nombre del proyecto..."
+                        style={{ width: "160px", background: C.bg, border: `1.5px solid ${C.navy}40`, borderRadius: "100px", padding: "8px 14px", fontSize: "13px", fontFamily: "inherit", color: C.text }} />
+                      <button onClick={() => addVenture(n => setForm(f => ({ ...f, venture: n })))} style={{ padding: "8px 14px", borderRadius: "100px", background: C.navy, color: "#fff", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: "700" }}>OK</button>
+                      <button onClick={() => { setAddingVenture(false); setNewVentureName(""); }} style={{ padding: "8px 12px", borderRadius: "100px", background: C.bg, color: C.muted, border: "none", cursor: "pointer", fontSize: "13px" }}>✕</button>
+                    </div>
+                  ) : (
+                    <button onClick={() => setAddingVenture(true)}
+                      style={{ padding: "9px 16px", borderRadius: "100px", background: C.bg, color: C.muted, border: `1.5px dashed ${C.line}`, cursor: "pointer", fontSize: "13px", fontWeight: "700" }}>
+                      {allVentures.length === 0 ? "+ Crear proyecto" : "+ Proyecto"}
+                    </button>
+                  )}
+                </div>
+                {allVentures.length === 0 && !addingVenture && (
+                  <div style={{ fontSize: "12px", color: C.muted, marginTop: "8px" }}>Crea un proyecto para clasificar tu idea</div>
+                )}
+              </div>
+              {/* Tipo y Estado */}
+              {[{ label: "Tipo", key: "type", opts: TYPES }, { label: "Estado", key: "status", opts: STATUSES }].map(({ label, key, opts }) => (
                 <div key={key} style={{ marginBottom: "16px" }}>
                   <div style={{ fontSize: "11px", fontWeight: "800", color: C.muted, letterSpacing: "0.8px", marginBottom: "8px" }}>{label.toUpperCase()}</div>
                   <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
@@ -3044,6 +3075,14 @@ export default function App() {
             <div>
               <div style={{ fontSize: "20px", fontWeight: "800", color: C.text, marginBottom: "4px" }}>Proyectos</div>
               <div style={{ fontSize: "13px", color: C.muted, marginBottom: "24px" }}>Entra a cualquier proyecto para ver todo su historial</div>
+              {allVentures.length === 0 && (
+                <div style={{ textAlign: "center", padding: "64px 24px", background: C.card, borderRadius: "28px", border: `1.5px dashed ${C.line}` }}>
+                  <div style={{ fontSize: "36px", marginBottom: "16px" }}>◈</div>
+                  <div style={{ fontSize: "16px", fontWeight: "800", color: C.text, marginBottom: "8px" }}>Aún no tienes proyectos</div>
+                  <div style={{ fontSize: "13px", color: C.muted, marginBottom: "24px", lineHeight: "1.6" }}>Crea tu primera idea y asígnala a un proyecto.<br/>Aparecerá aquí automáticamente.</div>
+                  <button onClick={() => setTab("new")} style={{ background: C.navy, color: "#fff", border: "none", borderRadius: "100px", padding: "12px 28px", fontSize: "14px", fontWeight: "800", cursor: "pointer" }}>+ Nueva idea</button>
+                </div>
+              )}
               <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(3,1fr)", gap: "14px" }}>
                 {allVentures.map(v => {
                   const vm2   = getVM(v);
