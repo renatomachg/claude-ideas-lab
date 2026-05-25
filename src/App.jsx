@@ -169,13 +169,14 @@ const fmtDate = (iso) => {
   return isNaN(d) ? "" : d.toLocaleDateString("es-MX", { day: "2-digit", month: "short" });
 };
 
-const callClaude = async (system, user) => {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
+const callClaude = async (system, user, max_tokens = 2000) => {
+  const res = await fetch("/api/claude", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 2000, system, messages: [{ role: "user", content: user }] }),
+    body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens, system, messages: [{ role: "user", content: user }] }),
   });
   const d = await res.json();
+  if (d.error) throw new Error(d.error);
   return d.content?.find(b => b.type === "text")?.text || "";
 };
 
@@ -1079,39 +1080,33 @@ const AttachmentsPanel = ({ idea, onSave }) => {
 };
 
 // ─── Brave Search helper ──────────────────────────────────────────────
-const braveSearch = async (query, apiKey) => {
-  const res = await fetch(
-    `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=6&search_lang=en`,
-    { headers: { "Accept": "application/json", "X-Subscription-Token": apiKey } }
-  );
-  if (!res.ok) throw new Error(`Brave error ${res.status}`);
+const braveSearch = async (query) => {
+  const res = await fetch("/api/search", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query, count: 6 }),
+  });
+  if (!res.ok) throw new Error(`Search error ${res.status}`);
   const d = await res.json();
-  return (d.web?.results || []).map(r => ({ title: r.title, url: r.url, desc: r.description || "" }));
+  if (d.error) throw new Error(d.error);
+  return d.results || [];
 };
 
 // ─── Similar Ideas Modal ──────────────────────────────────────────────
 const SimilarIdeasModal = ({ idea, onClose }) => {
   const [result,  setResult]  = useState(null);
   const [loading, setLoading] = useState(false);
+  const [step,    setStep]    = useState("");
+  const [errMsg,  setErrMsg]  = useState("");
 
-  const [braveKey, setBraveKey]   = useState(() => localStorage.getItem("braveKey") || "");
-  const [keyInput, setKeyInput]   = useState("");
-  const [step,     setStep]       = useState("");
-
-  const saveKey = () => {
-    const k = keyInput.trim();
-    if (!k) return;
-    localStorage.setItem("braveKey", k);
-    setBraveKey(k);
-  };
-
-  const runSearch = async (key) => {
+  const runSearch = async () => {
     setLoading(true);
+    setErrMsg("");
     try {
       setStep("Buscando en internet...");
       const q1 = `${idea.title} alternatives competitors`;
       const q2 = `${idea.venture} ${idea.type} startup tools software`;
-      const [r1, r2] = await Promise.all([braveSearch(q1, key), braveSearch(q2, key)]);
+      const [r1, r2] = await Promise.all([braveSearch(q1), braveSearch(q2)]);
       const allResults = [...r1, ...r2].slice(0, 10);
 
       const webContext = allResults.map((r, i) =>
@@ -1150,17 +1145,13 @@ Máximo 4 similares, solo los más relevantes de los resultados.`,
       const cleaned = raw.replace(/```json|```/g, "").trim();
       setResult(JSON.parse(cleaned));
     } catch (e) {
-      if (e.message?.includes("401") || e.message?.includes("403")) {
-        setResult({ errorKey: true });
-      } else {
-        setResult({ error: true });
-      }
+      setErrMsg(e.message || "Error al analizar");
     }
     setStep("");
     setLoading(false);
   };
 
-  useEffect(() => { if (braveKey) runSearch(braveKey); }, [braveKey]);
+  useEffect(() => { runSearch(); }, []);
 
   const satColor = { "Alta": C.rose, "Media": C.brown, "Baja": C.green };
 
@@ -1176,42 +1167,25 @@ Máximo 4 similares, solo los más relevantes de los resultados.`,
         </div>
         <div style={{ fontSize: "11px", color: C.muted, marginBottom: "20px" }}>Brave busca en internet hoy · Claude analiza los resultados</div>
 
-        {/* Sin API key — formulario */}
-        {!braveKey && !loading && (
-          <div style={{ background: C.bg, borderRadius: "22px", padding: "24px" }}>
-            <div style={{ fontSize: "14px", fontWeight: "700", color: C.text, marginBottom: "6px" }}>Conecta Brave Search</div>
-            <div style={{ fontSize: "13px", color: C.muted, lineHeight: "1.6", marginBottom: "16px" }}>
-              Crea tu cuenta gratis en <span style={{ color: C.navy, fontWeight: "700" }}>api.search.brave.com</span> y pega tu API key aquí. 2,000 búsquedas/mes gratis.
-            </div>
-            <div style={{ display: "flex", gap: "8px" }}>
-              <input value={keyInput} onChange={e => setKeyInput(e.target.value)} onKeyDown={e => e.key === "Enter" && saveKey()}
-                placeholder="BSA..."
-                style={{ flex: 1, background: C.card, border: `1.5px solid ${C.line}`, borderRadius: "14px", padding: "12px 16px", fontSize: "13px", color: C.text, fontFamily: "inherit" }} />
-              <button onClick={saveKey} style={{ background: C.navy, color: "#fff", border: "none", borderRadius: "14px", padding: "12px 20px", fontSize: "13px", fontWeight: "800", cursor: "pointer" }}>
-                Guardar
-              </button>
-            </div>
-          </div>
-        )}
-
         {loading && (
           <div style={{ textAlign: "center", padding: "48px 0" }}>
             <Spin size={32} color={C.navy} />
             <div style={{ fontSize: "13px", color: C.muted, marginTop: "16px" }}>{step || "Procesando..."}</div>
           </div>
         )}
-        {result?.errorKey && (
+
+        {errMsg && !loading && (
           <div style={{ background: "#FEF0F0", borderRadius: "16px", padding: "16px" }}>
-            <div style={{ fontSize: "13px", color: C.rose, fontWeight: "700", marginBottom: "6px" }}>API key inválida</div>
-            <div style={{ fontSize: "12px", color: C.muted, marginBottom: "12px" }}>Verifica tu key en api.search.brave.com</div>
-            <button onClick={() => { localStorage.removeItem("braveKey"); setBraveKey(""); setResult(null); setKeyInput(""); }}
-              style={{ background: C.rose, color: "#fff", border: "none", borderRadius: "100px", padding: "8px 16px", fontSize: "12px", fontWeight: "700", cursor: "pointer" }}>
-              Cambiar key
+            <div style={{ fontSize: "13px", color: C.rose, fontWeight: "700", marginBottom: "6px" }}>Error al buscar</div>
+            <div style={{ fontSize: "12px", color: C.muted, marginBottom: "12px" }}>{errMsg}</div>
+            <button onClick={runSearch}
+              style={{ background: C.navy, color: "#fff", border: "none", borderRadius: "100px", padding: "8px 16px", fontSize: "12px", fontWeight: "700", cursor: "pointer" }}>
+              Reintentar
             </button>
           </div>
         )}
-        {result?.error && <div style={{ color: C.rose, fontSize: "14px", padding: "16px" }}>Error al analizar. Intenta de nuevo.</div>}
-        {result && !result.error && (
+
+        {result && !errMsg && (
           <>
             {/* Saturación */}
             {result.saturacion && (
@@ -1282,10 +1256,6 @@ Máximo 4 similares, solo los más relevantes de los resultados.`,
                 </div>
               </div>
             )}
-            <button onClick={() => { localStorage.removeItem("braveKey"); setBraveKey(""); setResult(null); setKeyInput(""); }}
-              style={{ background: "none", border: "none", fontSize: "11px", color: C.muted, cursor: "pointer", marginTop: "16px" }}>
-              Cambiar API key de Brave
-            </button>
           </>
         )}
       </div>
@@ -1498,7 +1468,7 @@ const ChatPanel = ({ idea, onSaveChat }) => {
     const history = [...msgs, userMsg];
     setMsgs(history); setInput(""); setLoading(true);
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
+      const res = await fetch("/api/claude", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
