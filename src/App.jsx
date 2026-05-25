@@ -1215,7 +1215,18 @@ export default function App() {
     timeLogs:  (() => { try { return JSON.parse(r.time_logs || "[]"); } catch { return []; } })(),
   });
 
-  // Auth desactivado en artifact
+  // ── Auth init ──────────────────────────────────────────────────────
+  useEffect(() => {
+    const init = async () => {
+      setAuthLoading(true);
+      await handleAuthCallback();
+      const u = await getSession();
+      setUser(u || null);
+      setAuthLoading(false);
+    };
+    init();
+  }, []);
+
   const handleAuth = (u) => setUser(u);
 
   const load = useCallback(async () => {
@@ -1225,7 +1236,7 @@ export default function App() {
     setSyncing(false);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { if (user) load(); }, [load, user]);
 
   const save = async () => {
     if (!form.title.trim()) return;
@@ -1324,7 +1335,20 @@ export default function App() {
     { id: "data",        icon: "⌗", label: "Data"      },
   ];
 
-  // Login desactivado en artifact — activo en Vercel
+  // ── Auth gate ──────────────────────────────────────────────────────
+  if (authLoading) {
+    return (
+      <div style={{ minHeight: "100vh", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ width: "56px", height: "56px", borderRadius: "20px", background: C.navy, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", fontSize: "26px", color: "#fff" }}>✦</div>
+          <div style={{ width: "24px", height: "24px", borderRadius: "50%", border: `3px solid ${C.navy}20`, borderTopColor: C.navy, animation: "spin 0.8s linear infinite", margin: "0 auto" }} />
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) return <LoginScreen onAuth={handleAuth} />;
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, fontFamily: "'DM Sans', system-ui, sans-serif", paddingBottom: "90px" }}>
