@@ -1,21 +1,108 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-// ─── Supabase ─────────────────────────────────────────────────────────
-const SB_URL  = "https://qeelvcpfayknmfuspltt.supabase.co";
-const SB_KEY  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFlZWx2Y3BmYXlrbm1mdXNwbHR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk0OTY2NzYsImV4cCI6MjA5NTA3MjY3Nn0.BW-hAQLrTv5vhNQHCnDNqIW0kUHhIQgHtOeMoOBl-vg";
-const USER_KEY = "renato";
+// ─── Supabase Auth ────────────────────────────────────────────────────
+const SB_URL = "https://qeelvcpfayknmfuspltt.supabase.co";
+const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFlZWx2Y3BmYXlrbm1mdXNwbHR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk0OTY2NzYsImV4cCI6MjA5NTA3MjY3Nn0.BW-hAQLrTv5vhNQHCnDNqIW0kUHhIQgHtOeMoOBl-vg";
 
+// ─── Auth helpers ────────────────────────────────────────────────────
+const TOKEN_KEY = "sb-qeelvcpfayknmfuspltt-auth-token";
+
+const getToken = () => {
+  try {
+    const raw = localStorage.getItem(TOKEN_KEY);
+    if (!raw) return SB_KEY;
+    return JSON.parse(raw)?.access_token || SB_KEY;
+  } catch { return SB_KEY; }
+};
+
+const saveToken = (data) => {
+  localStorage.setItem(TOKEN_KEY, JSON.stringify(data));
+};
+
+const clearToken = () => localStorage.removeItem(TOKEN_KEY);
+
+const getSession = async () => {
+  try {
+    const token = getToken();
+    if (token === SB_KEY) return null;
+    const res = await fetch(`${SB_URL}/auth/v1/user`, {
+      headers: { "apikey": SB_KEY, "Authorization": `Bearer ${token}` }
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch { return null; }
+};
+
+const signInWithGoogle = () => {
+  const redirectTo = encodeURIComponent(window.location.origin + window.location.pathname);
+  window.location.href = `${SB_URL}/auth/v1/authorize?provider=google&redirect_to=${redirectTo}`;
+};
+
+const signInWithEmail = async (email, password) => {
+  const res = await fetch(`${SB_URL}/auth/v1/token?grant_type=password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "apikey": SB_KEY },
+    body: JSON.stringify({ email, password }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error_description || data.msg || "Error al iniciar sesión");
+  saveToken(data);
+  return data.user;
+};
+
+const signUpWithEmail = async (email, password) => {
+  const res = await fetch(`${SB_URL}/auth/v1/signup`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "apikey": SB_KEY },
+    body: JSON.stringify({ email, password }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error_description || data.msg || "Error al registrarse");
+  if (data.access_token) saveToken(data);
+  return data.user;
+};
+
+const signOut = async () => {
+  try {
+    await fetch(`${SB_URL}/auth/v1/logout`, {
+      method: "POST",
+      headers: { "apikey": SB_KEY, "Authorization": `Bearer ${getToken()}` }
+    });
+  } catch {}
+  clearToken();
+  window.location.reload();
+};
+
+const handleAuthCallback = async () => {
+  const hash = window.location.hash;
+  if (!hash.includes("access_token")) return false;
+  const params = new URLSearchParams(hash.replace("#", ""));
+  const token = params.get("access_token");
+  if (token) {
+    saveToken({
+      access_token: token,
+      refresh_token: params.get("refresh_token"),
+      expires_in: parseInt(params.get("expires_in") || "3600"),
+      token_type: "bearer",
+    });
+    window.history.replaceState({}, "", window.location.pathname);
+    return true;
+  }
+  return false;
+};
+
+// DB helpers — now auth-aware
 const sb = async (method, path, body) => {
   const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
     method,
-    headers: { "Content-Type": "application/json", "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}`, "Prefer": "return=representation" },
+    headers: { "Content-Type": "application/json", "apikey": SB_KEY, "Authorization": `Bearer ${getToken()}`, "Prefer": "return=representation" },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
   const t = await res.text();
   return t ? JSON.parse(t) : null;
 };
 
-const dbLoad   = ()          => sb("GET",    `ideas?user_key=eq.${USER_KEY}&order=created_at.desc`);
+const dbLoad   = ()          => sb("GET",    `ideas?order=created_at.desc`);
 const dbInsert = (r)         => sb("POST",   `ideas`, r);
 const dbUpdate = (id, patch) => sb("PATCH",  `ideas?id=eq.${id}`, patch);
 const dbDelete = (id)        => sb("DELETE", `ideas?id=eq.${id}`);
@@ -961,8 +1048,147 @@ const IdeaCard = ({ idea, onExpand, onDebate, onDelete, onCycleStatus, onEditDat
   );
 };
 
+// ─── Login Screen — Niva style ────────────────────────────────────────
+const LoginScreen = ({ onAuth }) => {
+  const [mode,     setMode]     = useState("login");
+  const [email,    setEmail]    = useState("");
+  const [password, setPassword] = useState("");
+  const [loading,  setLoading]  = useState(false);
+  const [error,    setError]    = useState("");
+
+  const handleEmail = async () => {
+    if (!email || !password) { setError("Completa todos los campos"); return; }
+    setLoading(true); setError("");
+    try {
+      const user = mode === "login"
+        ? await signInWithEmail(email, password)
+        : await signUpWithEmail(email, password);
+      if (user) onAuth(user);
+      else setError("Revisa tu email para confirmar tu cuenta");
+    } catch (e) { setError(e.message); }
+    setLoading(false);
+  };
+
+  return (
+    <div style={{ minHeight: "100vh", background: C.bg, fontFamily: "'DM Sans', system-ui, sans-serif", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px 24px" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,600;9..40,700;9..40,800&display=swap');
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        @keyframes spin  { to { transform: rotate(360deg); } }
+        @keyframes float { 0%,100% { transform: translateY(0px); } 50% { transform: translateY(-8px); } }
+      `}</style>
+
+      {/* Blob bg */}
+      <div style={{ position: "fixed", inset: 0, zIndex: 0, overflow: "hidden" }}>
+        <svg viewBox="0 0 400 800" style={{ width: "100%", height: "100%", position: "absolute" }} preserveAspectRatio="xMidYMid slice">
+          <defs>
+            <radialGradient id="lg1" cx="70%" cy="30%" r="60%"><stop offset="0%" stopColor="#F47648" stopOpacity="0.5" /><stop offset="100%" stopColor="#F5C757" stopOpacity="0" /></radialGradient>
+            <radialGradient id="lg2" cx="20%" cy="70%" r="55%"><stop offset="0%" stopColor="#2A3875" stopOpacity="0.4" /><stop offset="100%" stopColor="#2A3875" stopOpacity="0" /></radialGradient>
+            <radialGradient id="lg3" cx="85%" cy="80%" r="40%"><stop offset="0%" stopColor="#F47090" stopOpacity="0.35" /><stop offset="100%" stopColor="#F47090" stopOpacity="0" /></radialGradient>
+          </defs>
+          <rect width="400" height="800" fill="#F2EFE9" />
+          <ellipse cx="280" cy="240" rx="300" ry="300" fill="url(#lg1)" />
+          <ellipse cx="80"  cy="560" rx="280" ry="280" fill="url(#lg2)" />
+          <ellipse cx="340" cy="640" rx="200" ry="200" fill="url(#lg3)" />
+        </svg>
+      </div>
+
+      <div style={{ position: "relative", zIndex: 1, width: "100%", maxWidth: "360px" }}>
+
+        {/* Logo */}
+        <div style={{ textAlign: "center", marginBottom: "32px" }}>
+          <div style={{ animation: "float 3s ease-in-out infinite", display: "inline-block", marginBottom: "20px" }}>
+            <div style={{ width: "72px", height: "72px", borderRadius: "24px", background: C.navy, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 20px 60px ${C.navy}40` }}>
+              <span style={{ fontSize: "32px", color: "#fff", fontWeight: "800" }}>✦</span>
+            </div>
+          </div>
+          <div style={{ fontSize: "28px", fontWeight: "800", color: C.text, letterSpacing: "-0.5px", lineHeight: 1.2, marginBottom: "8px" }}>Claude Ideas Lab</div>
+          <div style={{ fontSize: "14px", color: C.sub }}>Captura y ejecuta tus ideas con IA</div>
+        </div>
+
+        {/* Card */}
+        <div style={{ background: "rgba(255,255,255,0.85)", backdropFilter: "blur(20px)", borderRadius: "28px", padding: "28px", boxShadow: "0 8px 40px rgba(0,0,0,0.10)" }}>
+
+          {/* Mode toggle */}
+          <div style={{ display: "flex", background: C.bg, borderRadius: "16px", padding: "4px", marginBottom: "24px" }}>
+            {[["login", "Iniciar sesión"], ["signup", "Registrarse"]].map(([m, l]) => (
+              <button key={m} onClick={() => { setMode(m); setError(""); }}
+                style={{ flex: 1, padding: "10px", borderRadius: "12px", border: "none", background: mode === m ? C.navy : "transparent", color: mode === m ? "#fff" : C.muted, fontSize: "13px", fontWeight: "700", cursor: "pointer", transition: "all 0.2s", fontFamily: "inherit" }}>
+                {l}
+              </button>
+            ))}
+          </div>
+
+          {/* Email field */}
+          <div style={{ marginBottom: "12px" }}>
+            <div style={{ fontSize: "11px", fontWeight: "700", color: C.muted, letterSpacing: "0.8px", marginBottom: "7px" }}>EMAIL</div>
+            <input
+              type="email" value={email} onChange={e => setEmail(e.target.value)}
+              placeholder="tu@email.com"
+              onKeyDown={e => e.key === "Enter" && handleEmail()}
+              style={{ width: "100%", background: C.bg, border: `1.5px solid ${error ? C.rose : C.line}`, borderRadius: "14px", padding: "14px 16px", fontSize: "15px", color: C.text, fontFamily: "inherit", transition: "border 0.2s" }}
+            />
+          </div>
+
+          {/* Password field */}
+          <div style={{ marginBottom: "20px" }}>
+            <div style={{ fontSize: "11px", fontWeight: "700", color: C.muted, letterSpacing: "0.8px", marginBottom: "7px" }}>CONTRASEÑA</div>
+            <input
+              type="password" value={password} onChange={e => setPassword(e.target.value)}
+              placeholder="••••••••"
+              onKeyDown={e => e.key === "Enter" && handleEmail()}
+              style={{ width: "100%", background: C.bg, border: `1.5px solid ${error ? C.rose : C.line}`, borderRadius: "14px", padding: "14px 16px", fontSize: "15px", color: C.text, fontFamily: "inherit", transition: "border 0.2s" }}
+            />
+          </div>
+
+          {/* Error */}
+          {error && (
+            <div style={{ background: "#FEF0F0", border: `1px solid ${C.rose}40`, borderRadius: "12px", padding: "12px 14px", marginBottom: "16px", fontSize: "13px", color: C.rose, fontWeight: "600" }}>
+              {error}
+            </div>
+          )}
+
+          {/* Email CTA */}
+          <button onClick={handleEmail} disabled={loading}
+            style={{ width: "100%", background: loading ? C.muted : C.navy, color: "#fff", border: "none", borderRadius: "16px", padding: "16px", fontSize: "15px", fontWeight: "800", cursor: loading ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px", marginBottom: "16px", fontFamily: "inherit", transition: "all 0.2s" }}>
+            {loading
+              ? <div style={{ width: "18px", height: "18px", borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite" }} />
+              : null}
+            {loading ? "Entrando..." : mode === "login" ? "Iniciar sesión" : "Crear cuenta"}
+          </button>
+
+          {/* Divider */}
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
+            <div style={{ flex: 1, height: "1px", background: C.line }} />
+            <span style={{ fontSize: "12px", color: C.muted, fontWeight: "600" }}>O</span>
+            <div style={{ flex: 1, height: "1px", background: C.line }} />
+          </div>
+
+          {/* Google button */}
+          <button onClick={signInWithGoogle}
+            style={{ width: "100%", background: "#fff", border: `1.5px solid ${C.line}`, borderRadius: "16px", padding: "14px 24px", fontSize: "14px", fontWeight: "700", color: C.text, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px", fontFamily: "inherit" }}>
+            <svg width="18" height="18" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+            </svg>
+            Continuar con Google
+          </button>
+        </div>
+
+        <div style={{ textAlign: "center", marginTop: "20px", fontSize: "12px", color: C.muted, lineHeight: "1.6" }}>
+          Tus ideas se almacenan de forma segura en la nube
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── Main App ─────────────────────────────────────────────────────────
 export default function App() {
+  const [user,        setUser]        = useState(undefined); // undefined = loading, null = not authed
+  const [authLoading, setAuthLoading] = useState(true);
   const [ideas,       setIdeas]       = useState([]);
   const [venture,     setVenture]     = useState("Todos");
   const [statusF,     setStatusF]     = useState("Todos");
@@ -989,6 +1215,9 @@ export default function App() {
     timeLogs:  (() => { try { return JSON.parse(r.time_logs || "[]"); } catch { return []; } })(),
   });
 
+  // Auth desactivado en artifact
+  const handleAuth = (u) => setUser(u);
+
   const load = useCallback(async () => {
     setSyncing(true); setSyncErr(null);
     try { const rows = await dbLoad(); setIdeas(rows.map(mapRow)); }
@@ -1000,7 +1229,7 @@ export default function App() {
 
   const save = async () => {
     if (!form.title.trim()) return;
-    const row = { id: genId(), title: form.title, description: form.description, venture: form.venture, type: form.type, status: form.status, expansion: "", debate: "", user_key: USER_KEY };
+    const row = { id: genId(), title: form.title, description: form.description, venture: form.venture, type: form.type, status: form.status, expansion: "", debate: "", user_id: user?.id };
     setIdeas(p => [{ ...row, createdAt: new Date().toISOString(), startDate: "", durationWeeks: 1, checklist: [], timeLogs: [] }, ...p]);
     setForm({ title: "", description: "", venture: "Mercasync", type: "Artifact", status: "Idea" });
     setTab("home");
@@ -1095,6 +1324,8 @@ export default function App() {
     { id: "data",        icon: "⌗", label: "Data"      },
   ];
 
+  // Login desactivado en artifact — activo en Vercel
+
   return (
     <div style={{ minHeight: "100vh", background: C.bg, fontFamily: "'DM Sans', system-ui, sans-serif", paddingBottom: "90px" }}>
       <style>{`
@@ -1107,6 +1338,7 @@ export default function App() {
         @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+        @keyframes float { 0%,100% { transform: translateY(0px); } 50% { transform: translateY(-8px); } }
         input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.4; }
         button { font-family: inherit; }
       `}</style>
@@ -1126,11 +1358,19 @@ export default function App() {
             </div>
             {syncErr && <div style={{ fontSize: "12px", color: C.rose, marginTop: "3px" }}>{syncErr}</div>}
           </div>
-          <div style={{ display: "flex", gap: "10px" }}>
+          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
             <button onClick={() => setShowVoice(true)} style={{ width: "44px", height: "44px", borderRadius: "14px", background: C.card, border: "none", fontSize: "18px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 10px rgba(0,0,0,0.07)" }}>🎙</button>
             <button onClick={() => setTab(tab === "new" ? "home" : "new")} style={{ height: "44px", padding: "0 20px", borderRadius: "14px", background: tab === "new" ? C.bg : C.text, color: tab === "new" ? C.muted : "#fff", border: "none", fontSize: "14px", fontWeight: "700", cursor: "pointer" }}>
               {tab === "new" ? "Cancelar" : "+ Nueva"}
             </button>
+            {/* User avatar + signout */}
+            <div title={user?.email} onClick={signOut}
+              style={{ width: "44px", height: "44px", borderRadius: "14px", background: user?.user_metadata?.avatar_url ? "transparent" : C.navy, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", flexShrink: 0, boxShadow: "0 2px 10px rgba(0,0,0,0.1)" }}>
+              {user?.user_metadata?.avatar_url
+                ? <img src={user.user_metadata.avatar_url} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                : <span style={{ fontSize: "16px", color: "#fff", fontWeight: "800" }}>{(user?.email || "U")[0].toUpperCase()}</span>
+              }
+            </div>
           </div>
         </div>
 
